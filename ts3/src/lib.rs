@@ -233,15 +233,10 @@ impl Encode for &str {
 
 impl Encode for bool {
     fn encode(&self, writer: &mut String) {
-        write!(
-            writer,
-            "{}",
-            match self {
-                false => b'0',
-                true => b'1',
-            }
-        )
-        .unwrap();
+        writer.push(match self {
+            false => '0',
+            true => '1',
+        });
     }
 }
 
@@ -249,15 +244,11 @@ impl Decode for bool {
     type Error = Error;
 
     fn decode(buf: &[u8]) -> Result<bool, Self::Error> {
-        match buf.get(0) {
-            Some(b) => match b {
-                b'0' => Ok(true),
-                b'1' => Ok(false),
-                _ => Err(Error(ErrorKind::Decode(
-                    DecodeError::UnexpectedByte(*b).into(),
-                ))),
-            },
-            None => Err(Error(ErrorKind::Decode(DecodeError::UnexpectedEof.into()))),
+        match buf {
+            b"0" => Ok(false),
+            b"1" => Ok(true),
+            [] => Err(Error(ErrorKind::Decode(DecodeError::UnexpectedEof))),
+            [byte, ..] => Err(Error(ErrorKind::Decode(DecodeError::UnexpectedByte(*byte)))),
         }
     }
 }
@@ -367,5 +358,26 @@ mod tests {
             _ => unreachable!(),
         };
         assert!(id == 0 && msg == "ok".to_owned());
+    }
+}
+
+#[cfg(test)]
+mod bool_tests {
+    use super::{Decode, Encode};
+
+    #[test]
+    fn test_bool_decode_matches_encode() {
+        for value in [false, true] {
+            let mut encoded = String::new();
+            value.encode(&mut encoded);
+            assert_eq!(bool::decode(encoded.as_bytes()).unwrap(), value);
+        }
+    }
+
+    #[test]
+    fn test_bool_decode_rejects_invalid_values() {
+        assert!(bool::decode(b"").is_err());
+        assert!(bool::decode(b"2").is_err());
+        assert!(bool::decode(b"01").is_err());
     }
 }
