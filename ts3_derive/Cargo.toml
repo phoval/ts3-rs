@@ -2,7 +2,7 @@
 name = "ts3_derive"
 version = "0.4.0"
 authors = ["MrGunflame <git@robbsrv.de>"]
-edition = "2021"
+edition = "2024"
 description = "Derive macro for ts3 crate"
 documentation = "https://docs.rs/ts3_derive"
 license = "MIT OR Apache-2.0"
@@ -12,6 +12,6 @@ repository = "https://github.com/MrGunflame/ts3-rs"
 proc-macro = true
 
 [dependencies]
-syn = "1.0.67"
+syn = "3.0.5"
 quote = "1.0.9"
 proc-macro2 = "1.0"

@@ -5,8 +5,6 @@ use crate::request::{Request, RequestBuilder, ServerNotifyRegister, TextMessageT
 use crate::response::Whoami;
 use crate::shared::list::Pipe;
 
-pub use async_trait::async_trait;
-
 use crate::shared::{ClientDatabaseId, List, ServerGroupId, ServerId};
 use crate::{
     event::{EventHandler, Handler},
