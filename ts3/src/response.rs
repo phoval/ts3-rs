@@ -168,3 +168,16 @@ impl Decode for VirtualServerStatus {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::Entry;
+    use crate::Decode;
+
+    #[test]
+    fn test_entry_get_preserves_utf8() {
+        let entry = Entry::decode(b"channel_name=Pex\\s\xC3\xA0\\sballe").unwrap();
+
+        assert_eq!(entry.get::<String>("channel_name").unwrap(), "Pex à balle");
+    }
+}

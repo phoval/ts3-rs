@@ -68,7 +68,7 @@ pub use client::Client;
 pub use ts3_derive::Decode;
 
 use std::{
-    convert::{Infallible, TryFrom},
+    convert::Infallible,
     fmt::{Debug, Write},
     io,
     num::ParseIntError,
@@ -175,49 +175,38 @@ impl Decode for String {
     type Error = Error;
 
     fn decode(buf: &[u8]) -> Result<String, Self::Error> {
-        // Create a new string, allocating the same length as the buffer. Most
-        // chars are one-byte only.
-        let mut string = String::with_capacity(buf.len());
+        let mut bytes = Vec::with_capacity(buf.len());
+        let mut iter = buf.iter().copied();
 
-        // Create a peekable iterator to iterate over all bytes, appending all bytes
-        // and replacing escaped chars.
-        let mut iter = buf.into_iter().peekable();
         while let Some(b) = iter.next() {
             match b {
-                // Match any escapes, starting with a '\' followed by another char.
                 b'\\' => {
-                    match iter.peek() {
-                        Some(c) => match c {
-                            b'\\' => string.push('\\'),
-                            b'/' => string.push('/'),
-                            b's' => string.push(' '),
-                            b'p' => string.push('|'),
-                            b'a' => string.push(7u8 as char),
-                            b'b' => string.push(8u8 as char),
-                            b'f' => string.push(12u8 as char),
-                            b'n' => string.push(10u8 as char),
-                            b'r' => string.push(13u8 as char),
-                            b't' => string.push(9u8 as char),
-                            b'v' => string.push(11u8 as char),
-                            _ => {
-                                return Err(Error(ErrorKind::Decode(DecodeError::UnexpectedByte(
-                                    **c,
-                                ))))
-                            }
-                        },
-                        None => {
-                            return Err(Error(ErrorKind::Decode(DecodeError::UnexpectedEof.into())))
+                    let escaped = iter
+                        .next()
+                        .ok_or_else(|| Error(ErrorKind::Decode(DecodeError::UnexpectedEof)))?;
+
+                    bytes.push(match escaped {
+                        b'\\' => b'\\',
+                        b'/' => b'/',
+                        b's' => b' ',
+                        b'p' => b'|',
+                        b'a' => 7,
+                        b'b' => 8,
+                        b'f' => 12,
+                        b'n' => 10,
+                        b'r' => 13,
+                        b't' => 9,
+                        b'v' => 11,
+                        byte => {
+                            return Err(Error(ErrorKind::Decode(DecodeError::UnexpectedByte(byte))))
                         }
-                    }
-                    iter.next();
+                    });
                 }
-                _ => string.push(char::try_from(*b).unwrap()),
+                byte => bytes.push(byte),
             }
         }
 
-        // Shrink the string to its fitting size before returning it.
-        string.shrink_to_fit();
-        Ok(string)
+        String::from_utf8(bytes).map_err(|err| Error(ErrorKind::Utf8(err.utf8_error())))
     }
 }
 
@@ -351,6 +340,23 @@ mod tests {
     fn test_string_decode() {
         let buf = b"Hello\\sWorld!";
         assert_eq!(String::decode(buf).unwrap(), "Hello World!".to_owned());
+    }
+
+    #[test]
+    fn test_string_decode_preserves_utf8() {
+        let buf = b"Pex \xC3\xA0 balle";
+        assert_eq!(String::decode(buf).unwrap(), "Pex à balle");
+    }
+
+    #[test]
+    fn test_string_decode_escapes() {
+        let buf = br"space\spipe\ppath\/\\backslash";
+        assert_eq!(String::decode(buf).unwrap(), "space pipe|path/\\backslash");
+    }
+
+    #[test]
+    fn test_string_decode_rejects_invalid_utf8() {
+        assert!(String::decode(b"invalid \xC3(").is_err());
     }
 
     #[test]
